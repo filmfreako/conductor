@@ -20,6 +20,7 @@ export const expensesRef = () => collection(db, "vehicles", VEHICLE_ID, "expense
 export const shiftsRef = () => collection(db, "vehicles", VEHICLE_ID, "shifts");
 export const earningsRef = () => collection(db, "vehicles", VEHICLE_ID, "earnings");
 export const tripsRef = () => collection(db, "vehicles", VEHICLE_ID, "trips");
+export const obligationsRef = () => collection(db, "vehicles", VEHICLE_ID, "obligations");
 
 // ─── Daily archive: one document per day with all data ───
 export const archivesRef = () => collection(db, "vehicles", VEHICLE_ID, "dailyArchives");
