@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import * as XLSX from "xlsx";
-import { expensesRef, shiftsRef, earningsRef, tripsRef, addDocument, deleteDocument, subscribeToCollection, subscribeActiveDay, setActiveDay, archiveDay, subscribeArchives } from "./firebase.js";
+import { expensesRef, shiftsRef, earningsRef, tripsRef, obligationsRef, addDocument, deleteDocument, subscribeToCollection, subscribeActiveDay, setActiveDay, archiveDay, subscribeArchives } from "./firebase.js";
 
 function compressImage(u,mW=800,q=0.45){return new Promise(r=>{const i=new Image();i.onload=()=>{const c=document.createElement("canvas");let w=i.width,h=i.height;if(w>mW){h=(mW/w)*h;w=mW;}c.width=w;c.height=h;c.getContext("2d").drawImage(i,0,0,w,h);r(c.toDataURL("image/jpeg",q));};i.src=u;})}
 
@@ -18,11 +18,58 @@ function gTime(){const n=new Date();return n.getHours().toString().padStart(2,'0
 
 const OP=0.60,DP2=0.40;
 const MES=["Enero","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+const MFULL=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
 function getWeekRange(ds){const d=new Date(ds+"T12:00:00"),dy=d.getDay(),m=new Date(d);m.setDate(d.getDate()-((dy+6)%7));const s=new Date(m);s.setDate(m.getDate()+6);return{start:m.toISOString().split("T")[0],end:s.toISOString().split("T")[0]};}
 function isInWeek(ds){const{start,end}=getWeekRange(gT());return ds>=start&&ds<=end;}
 
 function dayTotals(e=[],x=[],t=[]){const tI=e.reduce((s,i)=>s+(i.totalEarnings||0),0)+t.reduce((s,i)=>s+(i.amount||0),0);const tO=x.reduce((s,i)=>s+(i.amount||0),0);const tC=e.reduce((s,i)=>s+(i.cashReceived||0),0);return{tI,tO,tC,net:tI-tO};}
+
+// ─── Obligation date generators ───
+// Given an obligation definition, generate all upcoming dates for a given year
+function getObligationDates(obl,year){
+  const dates=[];
+  if(obl.freq==="monthly"){
+    for(let m=0;m<12;m++){
+      const day=Math.min(obl.day,new Date(year,m+1,0).getDate());
+      dates.push(new Date(year,m,day).toISOString().split("T")[0]);
+    }
+  } else if(obl.freq==="bimonthly"){
+    // Every 2 months starting from startMonth (0-indexed)
+    const sm=obl.startMonth||2; // default March (2)
+    for(let m=sm;m<12;m+=2){
+      const day=Math.min(obl.day||1,new Date(year,m+1,0).getDate());
+      dates.push(new Date(year,m,day).toISOString().split("T")[0]);
+    }
+  } else if(obl.freq==="yearly"){
+    const day=Math.min(obl.day,new Date(year,obl.month,0).getDate());
+    dates.push(new Date(year,obl.month,day).toISOString().split("T")[0]);
+  } else if(obl.freq==="custom"&&obl.customDate){
+    dates.push(obl.customDate);
+  }
+  return dates;
+}
+
+function getNextDate(obl){
+  const today=gT();
+  const y=new Date().getFullYear();
+  const dates=[...getObligationDates(obl,y),...getObligationDates(obl,y+1)];
+  return dates.find(d=>d>=today)||dates[0]||null;
+}
+
+function daysUntil(dateStr){
+  if(!dateStr)return 999;
+  const t=new Date(gT()+"T12:00:00"),d=new Date(dateStr+"T12:00:00");
+  return Math.round((d-t)/864e5);
+}
+
+// Default obligations
+const DEFAULT_OBLS=[
+  {id:"obl_rodamiento",name:"Pago de rodamiento",freq:"monthly",day:1,color:"#FFD166",icon:"dollar"},
+  {id:"obl_cda",name:"Revisión preventiva CDA",freq:"bimonthly",day:1,startMonth:2,color:"#118AB2",icon:"check"},
+  {id:"obl_soat",name:"SOAT",freq:"yearly",day:9,month:1,color:"#EF476F",icon:"alert"},
+  {id:"obl_seguro",name:"Pago seguro todo riesgo",freq:"monthly",day:1,color:"#9B5DE5",icon:"dollar"},
+];
 
 function genXLS(data,archives){
   const wb=XLSX.utils.book_new(),td=new Date(),mn=MES[td.getMonth()]+" "+td.getFullYear();
@@ -69,6 +116,8 @@ const I={
   play:<svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.7"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
   stop:<svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>,
   cal:<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.7"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>,
+  bell:<svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.7"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>,
+  clip:<svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.7"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>,
 };
 
 const CSS=`@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
@@ -89,7 +138,7 @@ html,body,#root{height:100%}body{font-family:'Outfit',sans-serif;background:var(
 .dbn-t{font-size:14px;font-weight:700;color:var(--yl)}.dbn-s{font-size:11px;color:var(--t2);margin-top:1px}
 .cnt{flex:1;padding:0 16px 100px;overflow-y:auto}
 .bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:rgba(17,24,39,.94);backdrop-filter:blur(20px);border-top:1px solid var(--bd);display:flex;justify-content:space-around;padding:6px 0 max(8px,var(--sab));z-index:100}
-.nb{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 8px 4px;border-radius:12px;cursor:pointer;color:var(--t2);transition:all .2s;background:none;border:none;font-family:'Outfit',sans-serif;font-size:10px;font-weight:600}.nb.act{color:var(--ac);background:rgba(6,214,160,.1)}
+.nb{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 6px 4px;border-radius:12px;cursor:pointer;color:var(--t2);transition:all .2s;background:none;border:none;font-family:'Outfit',sans-serif;font-size:9px;font-weight:600}.nb.act{color:var(--ac);background:rgba(6,214,160,.1)}
 .card{background:var(--cd);border:1px solid var(--bd);border-radius:16px;padding:18px;margin-bottom:12px}
 .clbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--t2);margin-bottom:10px}
 .sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.st{font-size:18px;font-weight:700}
@@ -133,7 +182,10 @@ html,body,#root{height:100%}body{font-family:'Outfit',sans-serif;background:var(
 .pcg{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}.pch{font-size:10px;font-weight:700;color:var(--t2);padding:4px 0;text-transform:uppercase}
 .pd{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:10px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',monospace}
 .pd.ok{background:rgba(6,214,160,.08);color:var(--ac)}.pd.bad{background:rgba(239,71,111,.12);color:var(--rd)}.pd.free{background:rgba(123,139,168,.06);color:var(--t2)}.pd.today{box-shadow:inset 0 0 0 2px var(--yl)}.pd.empty{background:none}
+.pd.obl{position:relative}.pd.obl::after{content:'';position:absolute;bottom:3px;width:6px;height:6px;border-radius:50%}
 .plg{display:flex;gap:16px;margin-top:12px;justify-content:center}.pli{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t2)}.pdt{width:10px;height:10px;border-radius:3px}
+.ob-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700}
+.ob-badge.urgent{background:rgba(239,71,111,.12);color:var(--rd)}.ob-badge.soon{background:rgba(255,209,102,.12);color:var(--yl)}.ob-badge.ok{background:rgba(6,214,160,.08);color:var(--ac)}
 ::-webkit-scrollbar{width:0}@keyframes fu{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}.fade{animation:fu .3s ease forwards}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}.pulse{animation:pulse 2s ease-in-out infinite}`;
 
@@ -143,6 +195,7 @@ export default function App(){
   const[dailyEarnings,setDE]=useState([]);
   const[personalTrips,setPT]=useState([]);
   const[archives,setArchives]=useState([]);
+  const[obligations,setObligations]=useState([]);
   const[activeDay,setAD]=useState(null);
   const[tab,setTab]=useState("home");
   const[modal,setModal]=useState(null);
@@ -159,10 +212,17 @@ export default function App(){
     const u4=subscribeToCollection(tripsRef(),i=>setPT(i));
     const u5=subscribeActiveDay(d=>setAD(d));
     const u6=subscribeArchives(a=>setArchives(a));
-    return()=>{u1();u2();u3();u4();u5();u6();};
+    const u7=subscribeToCollection(obligationsRef(),items=>{
+      if(items.length===0){
+        // Seed default obligations on first load
+        DEFAULT_OBLS.forEach(o=>addDocument(obligationsRef(),o.id,o));
+      } else {
+        setObligations(items);
+      }
+    });
+    return()=>{u1();u2();u3();u4();u5();u6();u7();};
   },[]);
 
-  // Elapsed time ticker for active shift
   useEffect(()=>{
     if(!activeDay?.active||!activeDay?.startTime)return;
     const tick=()=>{
@@ -178,7 +238,6 @@ export default function App(){
     return()=>clearInterval(iv);
   },[activeDay?.active,activeDay?.startTime]);
 
-  // Set viewport meta for iPhone safe areas
   useEffect(()=>{
     let meta=document.querySelector('meta[name="viewport"]');
     if(meta){meta.setAttribute('content','width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover');}
@@ -188,13 +247,7 @@ export default function App(){
   const data={expenses,shifts,dailyEarnings,personalTrips};
   const isActive=activeDay?.active;
 
-  // Start a new shift (jornada) — always uses today's date and current time
-  const handleStartDay=async()=>{
-    const now=gTime();
-    await setActiveDay(gT(),now);
-  };
-
-  // End current shift: save shift record automatically, then deactivate
+  const handleStartDay=async()=>{await setActiveDay(gT(),gTime());};
   const handleEndDay=async()=>{
     if(!isActive)return;
     setClosing(true);
@@ -202,9 +255,7 @@ export default function App(){
     const startTime=activeDay.startTime||"00:00";
     const date=activeDay.date||gT();
     const shiftId=gId();
-    // Auto-save shift to shifts collection
     await addDocument(shiftsRef(),shiftId,{id:shiftId,date:date,start:startTime,end:endTime,auto:true,createdAt:new Date().toISOString()});
-    // Deactivate the day (set active=false)
     await setActiveDay(null);
     setClosing(false);
   };
@@ -215,17 +266,14 @@ export default function App(){
   const today=new Date(),todayStr=gT();
   const restricted=hR(today),rDig=gRD(today);
 
-  // Day totals
   const dI=dailyEarnings.reduce((s,e)=>s+(e.totalEarnings||0),0)+personalTrips.reduce((s,t)=>s+(t.amount||0),0);
   const dC=dailyEarnings.reduce((s,e)=>s+(e.cashReceived||0),0);
   const dO=expenses.reduce((s,e)=>s+(e.amount||0),0);
   const dN=dI-dO;
 
-  // Week totals
   const wA=archives.filter(a=>isInWeek(a.date));
   const wF=wA.reduce((acc,a)=>{const t=dayTotals(a.earnings||[],a.expenses||[],a.trips||[]);return{tI:acc.tI+t.tI,tO:acc.tO+t.tO,tC:acc.tC+t.tC};},{tI:0,tO:0,tC:0});
   const wI=wF.tI+dI,wO=wF.tO+dO,wC=wF.tC+dC,wN=wI-wO;
-
   const wr=getWeekRange(todayStr);
 
   // HOME
@@ -285,16 +333,111 @@ export default function App(){
     </div>
   </div>);
 
-  // OTHER TABS
+  // EXPENSES TAB
   const Exp=()=>(<div className="fade"><div className="sh"><span className="st">Gastos</span>{isActive&&<button className="btn bp bs" onClick={()=>setModal("expense")}>{I.plus} Nuevo</button>}</div>{!expenses.length?<div className="empty"><div className="ee">⛽</div><div className="et">Sin gastos hoy.</div></div>:<div className="card">{expenses.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map(e=><div key={e.id} className="li"><div className={`lic ${e.type==='Gas natural'?'gas':e.type==='Gasolina'?'fuel':'misc'}`}>{I.gas}</div><div className="lib"><div className="lim">{e.type}</div><div className="lis">{e.note||''}</div></div><div style={{display:'flex',alignItems:'center',gap:6}}>{e.receipt&&<img src={e.receipt} className="rt" onClick={()=>setVI(e.receipt)}/>}<div className="la r">-{fCOP(e.amount||0)}</div><button className="db" onClick={()=>delDoc(expensesRef(),e.id)}>{I.trash}</button></div></div>)}</div>}</div>);
 
+  // SHIFTS TAB
   const Shf=()=>(<div className="fade"><div className="sh"><span className="st">Turnos</span>{isActive&&<button className="btn bp bs" onClick={()=>setModal("shift")}>{I.plus} Nuevo</button>}</div>{!shifts.length?<div className="empty"><div className="ee">🕐</div><div className="et">Sin turnos hoy.</div></div>:<div className="card">{shifts.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map(s=>{const[sh,sm]=(s.start||'0:0').split(':').map(Number),[eh,em]=(s.end||'0:0').split(':').map(Number);let d=(eh*60+em)-(sh*60+sm);if(d<0)d+=1440;return<div key={s.id} className="li"><div className="lic" style={{background:'rgba(17,138,178,.12)',color:'var(--a2)'}}>{I.clock}</div><div className="lib"><div className="lim">{s.start} — {s.end}</div><div className="lis">{s.auto?'Auto-registrado':s.date||''}</div></div><div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:13,color:'var(--a2)'}}>{Math.floor(d/60)}h {d%60}m</span><button className="db" onClick={()=>delDoc(shiftsRef(),s.id)}>{I.trash}</button></div></div>;})}</div>}</div>);
 
+  // EARNINGS TAB
   const Ear=()=>(<div className="fade"><div className="sh"><span className="st">Ganancias</span>{isActive&&<button className="btn bp bs" onClick={()=>setModal("earning")}>{I.plus} Nuevo</button>}</div>{!dailyEarnings.length?<div className="empty"><div className="ee">💰</div><div className="et">Sin ganancias hoy.</div></div>:<div className="card">{dailyEarnings.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map(e=><div key={e.id} className="li"><div className="lic earn">{I.dollar}</div><div className="lib"><div className="lim">{e.platform}</div><div className="lis">Efvo: {fCOP(e.cashReceived||0)}</div></div><div style={{display:'flex',alignItems:'center',gap:6}}><div className="la g">+{fCOP(e.totalEarnings||0)}</div><button className="db" onClick={()=>delDoc(earningsRef(),e.id)}>{I.trash}</button></div></div>)}</div>}<div className="sh" style={{marginTop:16}}><span className="st">Viajes personales</span>{isActive&&<button className="btn bp bs" onClick={()=>setModal("trip")}>{I.plus} Nuevo</button>}</div>{!personalTrips.length?<div className="empty"><div className="ee">🚐</div><div className="et">Sin viajes hoy.</div></div>:<div className="card">{personalTrips.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map(t=><div key={t.id} className="li"><div className="lic trip">{I.route}</div><div className="lib"><div className="lim">{t.route||'Sin ruta'}</div><div className="lis">{t.time} · {t.client||''}</div></div><div style={{display:'flex',alignItems:'center',gap:6}}><div className="la g">+{fCOP(t.amount||0)}</div><button className="db" onClick={()=>delDoc(tripsRef(),t.id)}>{I.trash}</button></div></div>)}</div>}</div>);
 
+  // PICO Y PLACA TAB
   const Pyp=()=>{const y=today.getFullYear(),m=today.getMonth(),dim=new Date(y,m+1,0).getDate(),fd=new Date(y,m,1).getDay(),mn=today.toLocaleDateString("es-CO",{month:"long",year:"numeric"});const days=[];for(let j=0;j<fd;j++)days.push(null);for(let d=1;d<=dim;d++)days.push(d);return(<div className="fade"><div className="st" style={{marginBottom:14}}>Pico y Placa</div><div className="card"><div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14}}><div className="pb" style={{fontSize:16,padding:'8px 14px'}}>{I.plate} {PLATE}</div><div style={{fontSize:13,color:'var(--t2)'}}>Dígito: <strong style={{color:'var(--yl)'}}>{PD}</strong></div></div><div className="clbl" style={{textTransform:'capitalize'}}>{mn}</div><div className="pcg">{["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"].map(d=><div key={d} className="pch">{d}</div>)}{days.map((d,j)=>{if(d===null)return<div key={`e${j}`} className="pd empty"/>;const dt=new Date(y,m,d),it=d===today.getDate(),iS=dt.getDay()===0,ds=dt.toISOString().split("T")[0],iH=HOL.includes(ds),iR=hR(dt);let c="pd";if(it)c+=" today";if(iS||iH)c+=" free";else if(iR)c+=" bad";else c+=" ok";return<div key={d} className={c}>{d}</div>;})}</div><div className="plg"><div className="pli"><div className="pdt" style={{background:'var(--ac)'}}/> Circula</div><div className="pli"><div className="pdt" style={{background:'var(--rd)'}}/> Restricción</div><div className="pli"><div className="pdt" style={{background:'var(--bd)'}}/> Libre</div></div></div><div className="card"><div className="clbl">Info</div><div style={{fontSize:13,lineHeight:1.6,color:'var(--t2)'}}><p><strong style={{color:'var(--tx)'}}>Horario:</strong> Lun-Sáb, 5:30 AM — 9:00 PM</p><p style={{marginTop:6}}><strong style={{color:'var(--tx)'}}>Grupos:</strong> (9-0, 1-2, 3-4, 5-6, 7-8) rotación semanal</p></div></div></div>);};
 
-  // MODALS
+  // ─── OBLIGACIONES TAB ───
+  const Obl=()=>{
+    const[oblMonth,setOblMonth]=useState(today.getMonth());
+    const[oblYear,setOblYear]=useState(today.getFullYear());
+    const y=oblYear,m=oblMonth;
+    const dim=new Date(y,m+1,0).getDate(),fd=new Date(y,m,1).getDay();
+    const days=[];for(let j=0;j<fd;j++)days.push(null);for(let d=1;d<=dim;d++)days.push(d);
+
+    // Build a map: dateStr -> [obligation colors]
+    const oblMap={};
+    obligations.forEach(obl=>{
+      const dates=getObligationDates(obl,y);
+      dates.forEach(ds=>{
+        const dd=new Date(ds+"T12:00:00");
+        if(dd.getMonth()===m){
+          if(!oblMap[ds])oblMap[ds]=[];
+          oblMap[ds].push(obl.color||'var(--yl)');
+        }
+      });
+    });
+
+    const prevM=()=>{if(m===0){setOblMonth(11);setOblYear(y-1);}else setOblMonth(m-1);};
+    const nextM=()=>{if(m===11){setOblMonth(0);setOblYear(y+1);}else setOblMonth(m+1);};
+
+    // Sort obligations by next date
+    const sorted=[...obligations].map(o=>({...o,next:getNextDate(o),du:daysUntil(getNextDate(o))})).sort((a,b)=>a.du-b.du);
+
+    return(<div className="fade">
+      <div className="sh"><span className="st">Obligaciones</span><button className="btn bp bs" onClick={()=>setModal("obligation")}>{I.plus} Nueva</button></div>
+
+      {/* Upcoming alerts */}
+      {sorted.filter(o=>o.du<=7&&o.du>=0).map(o=><div key={o.id+'alert'} className="card" style={{borderColor:o.du<=0?'rgba(239,71,111,.3)':'rgba(255,209,102,.3)',background:o.du<=0?'rgba(239,71,111,.05)':'rgba(255,209,102,.05)',marginBottom:8}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <div style={{width:40,height:40,borderRadius:10,background:o.du<=0?'rgba(239,71,111,.12)':'rgba(255,209,102,.12)',display:'flex',alignItems:'center',justifyContent:'center',color:o.du<=0?'var(--rd)':'var(--yl)',flexShrink:0}}>{I.bell}</div>
+          <div style={{flex:1}}><div style={{fontSize:14,fontWeight:700,color:o.du<=0?'var(--rd)':'var(--yl)'}}>{o.name}</div><div style={{fontSize:12,color:'var(--t2)',marginTop:2}}>{o.du<=0?'¡Vence hoy!':`Faltan ${o.du} día${o.du===1?'':'s'}`} — {o.next}</div></div>
+        </div>
+      </div>)}
+
+      {/* Calendar */}
+      <div className="card">
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+          <button onClick={prevM} style={{background:'none',border:'none',color:'var(--t2)',cursor:'pointer',padding:8,fontSize:18}}>‹</button>
+          <div style={{fontSize:14,fontWeight:700,textTransform:'capitalize'}}>{MFULL[m]} {y}</div>
+          <button onClick={nextM} style={{background:'none',border:'none',color:'var(--t2)',cursor:'pointer',padding:8,fontSize:18}}>›</button>
+        </div>
+        <div className="pcg">
+          {["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"].map(d=><div key={d} className="pch">{d}</div>)}
+          {days.map((d,j)=>{
+            if(d===null)return<div key={`e${j}`} className="pd empty"/>;
+            const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const it=ds===todayStr;
+            const colors=oblMap[ds]||[];
+            let c="pd";
+            if(it)c+=" today";
+            if(colors.length)c+=" obl";
+            else c+=" free";
+            return<div key={d} className={c} style={{position:'relative'}}>
+              {d}
+              {colors.length>0&&<div style={{position:'absolute',bottom:2,display:'flex',gap:2,justifyContent:'center'}}>
+                {colors.slice(0,3).map((col,ci)=><div key={ci} style={{width:5,height:5,borderRadius:'50%',background:col}}/>)}
+              </div>}
+            </div>;
+          })}
+        </div>
+        <div className="plg" style={{flexWrap:'wrap'}}>
+          {obligations.map(o=><div key={o.id} className="pli"><div className="pdt" style={{background:o.color||'var(--yl)'}}/> {o.name.length>15?o.name.slice(0,15)+'…':o.name}</div>)}
+        </div>
+      </div>
+
+      {/* Obligation list */}
+      <div className="card">
+        <div className="clbl">Todas las obligaciones</div>
+        {sorted.map(o=>{
+          const badge=o.du<=0?'urgent':o.du<=7?'soon':'ok';
+          const badgeTxt=o.du<=0?'Hoy':o.du<=7?`${o.du}d`:`${o.du}d`;
+          const freqTxt=o.freq==='monthly'?'Mensual':o.freq==='bimonthly'?'Bimestral':o.freq==='yearly'?'Anual':'Personalizada';
+          return<div key={o.id} className="li">
+            <div style={{width:40,height:40,borderRadius:12,background:`${o.color||'var(--yl)'}20`,color:o.color||'var(--yl)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{I[o.icon]||I.bell}</div>
+            <div className="lib">
+              <div className="lim">{o.name}</div>
+              <div className="lis">{freqTxt} · Próx: {o.next||'—'}</div>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <span className={`ob-badge ${badge}`}>{badgeTxt}</span>
+              {!o.id.startsWith('obl_')&&<button className="db" onClick={()=>delDoc(obligationsRef(),o.id)}>{I.trash}</button>}
+            </div>
+          </div>;
+        })}
+      </div>
+    </div>);
+  };
+
+  // ─── MODALS ───
   const ExpM=()=>{const[f,sF]=useState({type:"Gas natural",amount:"",date:activeDay?.date||todayStr,note:"",receipt:null});const[comp,sC]=useState(false);const fR=useRef(null);const hF=e=>{const fl=e.target.files[0];if(!fl)return;sC(true);const r=new FileReader();r.onload=ev=>{compressImage(ev.target.result).then(img=>{sF(p=>({...p,receipt:img}));sC(false);});};r.readAsDataURL(fl);};const v=f.amount&&!saving;
   return(<div className="mo" onClick={()=>setModal(null)}><div className="ms" onClick={e=>e.stopPropagation()}><div className="mb2"/><div className="mt2">Registrar gasto</div>
     <div className="fg"><label className="fl">Tipo</label><div className="chs">{["Gas natural","Gasolina","Varios"].map(t=><span key={t} className={`ch ${f.type===t?'a':''}`} onClick={()=>sF({...f,type:t})}>{t}</span>)}</div></div>
@@ -310,16 +453,44 @@ export default function App(){
 
   const TrpM=()=>{const[f,sF]=useState({date:activeDay?.date||todayStr,amount:"",route:"",time:"",client:""});const v=f.amount&&!saving;return(<div className="mo" onClick={()=>setModal(null)}><div className="ms" onClick={e=>e.stopPropagation()}><div className="mb2"/><div className="mt2">Viaje personal</div><div className="fr"><div className="fg"><label className="fl">Fecha</label><input className="fi" type="date" value={f.date} onChange={e=>sF({...f,date:e.target.value})}/></div><div className="fg"><label className="fl">Valor</label><input className="fi" type="number" placeholder="50000" value={f.amount} onChange={e=>sF({...f,amount:e.target.value})}/></div></div><div className="fg"><label className="fl">Recorrido</label><input className="fi" placeholder="Chapinero → Aeropuerto" value={f.route} onChange={e=>sF({...f,route:e.target.value})}/></div><div className="fr"><div className="fg"><label className="fl">Horario</label><input className="fi" placeholder="2:00-3:30 PM" value={f.time} onChange={e=>sF({...f,time:e.target.value})}/></div><div className="fg"><label className="fl">Cliente</label><input className="fi" placeholder="Nombre" value={f.client} onChange={e=>sF({...f,client:e.target.value})}/></div></div><button className="btn bp" disabled={!v} style={{opacity:v?1:.4}} onClick={()=>addDoc(tripsRef(),{id:gId(),date:f.date,amount:Number(f.amount),route:f.route,time:f.time,client:f.client})}>{saving?'Guardando...':'Guardar'}</button></div></div>);};
 
-  const navs=[{id:"home",icon:I.car,l:"Inicio"},{id:"expenses",icon:I.gas,l:"Gastos"},{id:"earnings",icon:I.dollar,l:"Ingresos"},{id:"shifts",icon:I.clock,l:"Turnos"},{id:"pyp",icon:I.plate,l:"P&P"}];
+  // ─── NEW OBLIGATION MODAL ───
+  const OblM=()=>{
+    const[f,sF]=useState({name:"",freq:"monthly",day:"1",month:"0",startMonth:"0",color:"#FFD166",customDate:""});
+    const v=f.name&&!saving;
+    const colors=["#FFD166","#118AB2","#EF476F","#9B5DE5","#06D6A0","#F78C6B"];
+    return(<div className="mo" onClick={()=>setModal(null)}><div className="ms" onClick={e=>e.stopPropagation()}><div className="mb2"/><div className="mt2">Nueva obligación</div>
+      <div className="fg"><label className="fl">Nombre</label><input className="fi" placeholder="Ej: Cambio de aceite" value={f.name} onChange={e=>sF({...f,name:e.target.value})}/></div>
+      <div className="fg"><label className="fl">Frecuencia</label><div className="chs">
+        {[["monthly","Mensual"],["bimonthly","Bimestral"],["yearly","Anual"],["custom","Fecha fija"]].map(([k,l])=>
+          <span key={k} className={`ch ${f.freq===k?'a':''}`} onClick={()=>sF({...f,freq:k})}>{l}</span>
+        )}
+      </div></div>
+      {(f.freq==="monthly"||f.freq==="bimonthly")&&<div className="fg"><label className="fl">Día del mes</label><input className="fi" type="number" min="1" max="31" placeholder="1" value={f.day} onChange={e=>sF({...f,day:e.target.value})}/></div>}
+      {f.freq==="bimonthly"&&<div className="fg"><label className="fl">Mes de inicio</label><select className="fi" value={f.startMonth} onChange={e=>sF({...f,startMonth:e.target.value})}>{MFULL.map((mn,i)=><option key={i} value={i}>{mn}</option>)}</select></div>}
+      {f.freq==="yearly"&&<><div className="fr"><div className="fg"><label className="fl">Día</label><input className="fi" type="number" min="1" max="31" value={f.day} onChange={e=>sF({...f,day:e.target.value})}/></div><div className="fg"><label className="fl">Mes</label><select className="fi" value={f.month} onChange={e=>sF({...f,month:e.target.value})}>{MFULL.map((mn,i)=><option key={i} value={i}>{mn}</option>)}</select></div></div></>}
+      {f.freq==="custom"&&<div className="fg"><label className="fl">Fecha específica</label><input className="fi" type="date" value={f.customDate} onChange={e=>sF({...f,customDate:e.target.value})}/></div>}
+      <div className="fg"><label className="fl">Color</label><div style={{display:'flex',gap:10}}>{colors.map(c=><div key={c} onClick={()=>sF({...f,color:c})} style={{width:32,height:32,borderRadius:10,background:c,cursor:'pointer',border:f.color===c?'3px solid var(--tx)':'3px solid transparent'}}/>)}</div></div>
+      <button className="btn bp" disabled={!v} style={{opacity:v?1:.4,marginTop:8}} onClick={()=>{
+        const id=gId();
+        const obl={id,name:f.name,freq:f.freq,day:Number(f.day)||1,color:f.color,icon:"bell"};
+        if(f.freq==="bimonthly")obl.startMonth=Number(f.startMonth)||0;
+        if(f.freq==="yearly")obl.month=Number(f.month)||0;
+        if(f.freq==="custom")obl.customDate=f.customDate;
+        addDoc(obligationsRef(),obl);
+      }}>{saving?'Guardando...':'Guardar obligación'}</button>
+    </div></div>);
+  };
+
+  const navs=[{id:"home",icon:I.car,l:"Inicio"},{id:"expenses",icon:I.gas,l:"Gastos"},{id:"earnings",icon:I.dollar,l:"Ingresos"},{id:"shifts",icon:I.clock,l:"Turnos"},{id:"obl",icon:I.clip,l:"Oblig."},{id:"pyp",icon:I.plate,l:"P&P"}];
   const tL=today.toLocaleDateString("es-CO",{weekday:"long",day:"numeric",month:"long"});
 
   return(<><style>{CSS}</style><div className="app">
     <div className="hdr"><div><h1>🚐 Conductor</h1><div className="hd">{tL}</div><div className={`syn ${synced?'ok':'off'}`}>{I.sync} {synced?'Sincronizado':'Conectando...'}</div></div><div className="pb">{PLATE}</div></div>
     {isActive&&<div className="dbn"><div className="dbn-i"><span className="pulse">{I.sun}</span></div><div><div className="dbn-t">Jornada activa{activeDay.startTime?' desde '+activeDay.startTime:''}</div><div className="dbn-s">{elapsed?'Tiempo: '+elapsed:'Registrando datos'}</div></div></div>}
     <div className={`pyp ${restricted?'bad':'ok'}`}><div className="pyp-i">{restricted?I.alert:I.check}</div><div><div className="pyp-m">{restricted?'⚠️ Pico y placa':'✅ Puedes circular'}</div><div className="pyp-s">{rDig?`Placas ${rDig.join(' y ')} · 5:30-9:00 PM`:'Sin restricción'}</div></div></div>
-    <div className="cnt">{tab==="home"&&<Home/>}{tab==="expenses"&&<Exp/>}{tab==="earnings"&&<Ear/>}{tab==="shifts"&&<Shf/>}{tab==="pyp"&&<Pyp/>}</div>
+    <div className="cnt">{tab==="home"&&<Home/>}{tab==="expenses"&&<Exp/>}{tab==="earnings"&&<Ear/>}{tab==="shifts"&&<Shf/>}{tab==="obl"&&<Obl/>}{tab==="pyp"&&<Pyp/>}</div>
     <nav className="bnav">{navs.map(n=><button key={n.id} className={`nb ${tab===n.id?'act':''}`} onClick={()=>setTab(n.id)}>{n.icon}{n.l}</button>)}</nav>
-    {modal==="expense"&&<ExpM/>}{modal==="shift"&&<ShfM/>}{modal==="earning"&&<EarM/>}{modal==="trip"&&<TrpM/>}
+    {modal==="expense"&&<ExpM/>}{modal==="shift"&&<ShfM/>}{modal==="earning"&&<EarM/>}{modal==="trip"&&<TrpM/>}{modal==="obligation"&&<OblM/>}
     {viewImg&&<div className="iv" onClick={()=>setVI(null)}><button className="ic">{I.x}</button><img src={viewImg} alt=""/></div>}
   </div></>);
 }
