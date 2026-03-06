@@ -32,8 +32,12 @@ export const getActiveDay = async () => {
   return snap.exists() ? snap.data() : null;
 };
 
-export const setActiveDay = async (dateStr) => {
-  await setDoc(activeDayRef(), { date: dateStr, startedAt: new Date().toISOString(), active: true });
+export const setActiveDay = async (dateStr, startTime) => {
+  if (dateStr === null) {
+    await setDoc(activeDayRef(), { active: false });
+  } else {
+    await setDoc(activeDayRef(), { date: dateStr, startTime: startTime || "", startedAt: new Date().toISOString(), active: true });
+  }
 };
 
 export const clearActiveDay = async () => {
