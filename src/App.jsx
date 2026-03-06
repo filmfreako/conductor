@@ -14,6 +14,7 @@ function fCOP(n){return new Intl.NumberFormat("es-CO",{style:"currency",currency
 function fD(d){return new Date(d+"T12:00:00").toLocaleDateString("es-CO",{weekday:"short",day:"numeric",month:"short"})}
 function gT(){return new Date().toISOString().split("T")[0]}
 function gId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+function gTime(){const n=new Date();return n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0');}
 
 const OP=0.60,DP2=0.40;
 const MES=["Enero","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
@@ -66,13 +67,14 @@ const I={
   sync:<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.7"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>,
   sun:<svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.7"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>,
   play:<svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.7"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
+  stop:<svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.7"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>,
   cal:<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.7"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>,
 };
 
 const CSS=`@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap');
-*{margin:0;padding:0;box-sizing:border-box}:root{--bg:#0A0E17;--sf:#111827;--cd:#1A2236;--bd:#283352;--tx:#F0F2F8;--t2:#7B8BA8;--ac:#06D6A0;--a2:#118AB2;--rd:#EF476F;--yl:#FFD166;--or:#F78C6B;--pu:#9B5DE5;--ow:#4EA8DE;--dr:#06D6A0;--xl:#217346}
+*{margin:0;padding:0;box-sizing:border-box}:root{--bg:#0A0E17;--sf:#111827;--cd:#1A2236;--bd:#283352;--tx:#F0F2F8;--t2:#7B8BA8;--ac:#06D6A0;--a2:#118AB2;--rd:#EF476F;--yl:#FFD166;--or:#F78C6B;--pu:#9B5DE5;--ow:#4EA8DE;--dr:#06D6A0;--xl:#217346;--sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px)}
 html,body,#root{height:100%}body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--tx);-webkit-font-smoothing:antialiased}
-.app{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;background:var(--bg)}
+.app{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);padding-top:var(--sat)}
 .hdr{padding:16px 18px 10px;display:flex;justify-content:space-between;align-items:flex-start}.hdr h1{font-size:22px;font-weight:800;letter-spacing:-.5px}
 .pb{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:var(--cd);border:1px solid var(--bd);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--yl);letter-spacing:1px}
 .hd{font-size:12px;color:var(--t2);font-family:'JetBrains Mono',monospace;margin-top:4px}
@@ -86,7 +88,7 @@ html,body,#root{height:100%}body{font-family:'Outfit',sans-serif;background:var(
 .dbn-i{width:40px;height:40px;border-radius:10px;background:rgba(255,209,102,.1);color:var(--yl);display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .dbn-t{font-size:14px;font-weight:700;color:var(--yl)}.dbn-s{font-size:11px;color:var(--t2);margin-top:1px}
 .cnt{flex:1;padding:0 16px 100px;overflow-y:auto}
-.bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:rgba(17,24,39,.94);backdrop-filter:blur(20px);border-top:1px solid var(--bd);display:flex;justify-content:space-around;padding:6px 0 max(8px,env(safe-area-inset-bottom));z-index:100}
+.bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:rgba(17,24,39,.94);backdrop-filter:blur(20px);border-top:1px solid var(--bd);display:flex;justify-content:space-around;padding:6px 0 max(8px,var(--sab));z-index:100}
 .nb{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 8px 4px;border-radius:12px;cursor:pointer;color:var(--t2);transition:all .2s;background:none;border:none;font-family:'Outfit',sans-serif;font-size:10px;font-weight:600}.nb.act{color:var(--ac);background:rgba(6,214,160,.1)}
 .card{background:var(--cd);border:1px solid var(--bd);border-radius:16px;padding:18px;margin-bottom:12px}
 .clbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--t2);margin-bottom:10px}
@@ -94,6 +96,7 @@ html,body,#root{height:100%}body{font-family:'Outfit',sans-serif;background:var(
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 18px;border-radius:12px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all .15s;width:100%}.btn:active{transform:scale(.97)}
 .bp{background:var(--ac);color:#0A0E17}.bs{padding:8px 14px;font-size:13px;width:auto;border-radius:10px}.bo{background:transparent;border:1px solid var(--bd);color:var(--t2)}.bx{background:rgba(33,115,70,.15);color:var(--xl);border:1px solid rgba(33,115,70,.3)}
 .bnd{background:linear-gradient(135deg,rgba(6,214,160,.12),rgba(17,138,178,.12));border:1px solid rgba(6,214,160,.25);color:var(--ac);font-size:15px;padding:16px;border-radius:16px}
+.bstop{background:linear-gradient(135deg,rgba(239,71,111,.12),rgba(239,71,111,.06));border:1px solid rgba(239,71,111,.3);color:var(--rd);font-size:15px;padding:16px;border-radius:16px}
 .fg{margin-bottom:14px}.fl{display:block;font-size:11px;font-weight:700;color:var(--t2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
 .fi{width:100%;padding:12px 14px;background:var(--sf);border:1px solid var(--bd);border-radius:10px;color:var(--tx);font-family:'Outfit',sans-serif;font-size:15px;outline:none}.fi:focus{border-color:var(--ac)}
 .fr{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -108,11 +111,11 @@ html,body,#root{height:100%}body{font-family:'Outfit',sans-serif;background:var(
 .ua{border:2px dashed var(--bd);border-radius:12px;padding:20px;text-align:center;cursor:pointer;color:var(--t2)}.ua:hover{border-color:var(--ac);color:var(--ac)}
 .up{width:100%;max-height:200px;object-fit:contain;border-radius:10px;margin-top:8px}
 .mo{position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(8px);z-index:200;display:flex;align-items:flex-end;justify-content:center}
-.ms{background:var(--cd);border-radius:24px 24px 0 0;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;padding:24px 20px max(24px,env(safe-area-inset-bottom));animation:su .3s ease}
+.ms{background:var(--cd);border-radius:24px 24px 0 0;width:100%;max-width:480px;max-height:88vh;overflow-y:auto;padding:24px 20px max(24px,var(--sab));animation:su .3s ease}
 @keyframes su{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .mb2{width:36px;height:4px;background:var(--bd);border-radius:2px;margin:0 auto 18px}.mt2{font-size:18px;font-weight:700;margin-bottom:20px}
 .iv{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px}.iv img{max-width:100%;max-height:90vh;border-radius:12px}
-.ic{position:absolute;top:20px;right:20px;background:rgba(255,255,255,.15);border:none;color:white;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.ic{position:absolute;top:max(20px,var(--sat));right:20px;background:rgba(255,255,255,.15);border:none;color:white;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .empty{text-align:center;padding:40px 20px;color:var(--t2)}.ee{font-size:40px;margin-bottom:10px;opacity:.5}.et{font-size:14px;line-height:1.5}
 .sc{background:var(--sf);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:8px}
 .sch{display:flex;align-items:center;gap:8px;margin-bottom:10px}
@@ -131,7 +134,8 @@ html,body,#root{height:100%}body{font-family:'Outfit',sans-serif;background:var(
 .pd{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:10px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',monospace}
 .pd.ok{background:rgba(6,214,160,.08);color:var(--ac)}.pd.bad{background:rgba(239,71,111,.12);color:var(--rd)}.pd.free{background:rgba(123,139,168,.06);color:var(--t2)}.pd.today{box-shadow:inset 0 0 0 2px var(--yl)}.pd.empty{background:none}
 .plg{display:flex;gap:16px;margin-top:12px;justify-content:center}.pli{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t2)}.pdt{width:10px;height:10px;border-radius:3px}
-::-webkit-scrollbar{width:0}@keyframes fu{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}.fade{animation:fu .3s ease forwards}`;
+::-webkit-scrollbar{width:0}@keyframes fu{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}.fade{animation:fu .3s ease forwards}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}.pulse{animation:pulse 2s ease-in-out infinite}`;
 
 export default function App(){
   const[expenses,setExpenses]=useState([]);
@@ -145,7 +149,8 @@ export default function App(){
   const[viewImg,setVI]=useState(null);
   const[synced,setSynced]=useState(false);
   const[saving,setSaving]=useState(false);
-  const[archiving,setArch]=useState(false);
+  const[closing,setClosing]=useState(false);
+  const[elapsed,setElapsed]=useState("");
 
   useEffect(()=>{
     const u1=subscribeToCollection(expensesRef(),i=>{setExpenses(i);setSynced(true);});
@@ -157,13 +162,51 @@ export default function App(){
     return()=>{u1();u2();u3();u4();u5();u6();};
   },[]);
 
+  // Elapsed time ticker for active shift
+  useEffect(()=>{
+    if(!activeDay?.active||!activeDay?.startTime)return;
+    const tick=()=>{
+      const[h,m]=activeDay.startTime.split(':').map(Number);
+      const st=new Date();st.setHours(h,m,0,0);
+      let diff=Math.floor((Date.now()-st.getTime())/1000);
+      if(diff<0)diff+=86400;
+      const hh=Math.floor(diff/3600),mm=Math.floor((diff%3600)/60);
+      setElapsed(`${hh}h ${mm.toString().padStart(2,'0')}m`);
+    };
+    tick();
+    const iv=setInterval(tick,30000);
+    return()=>clearInterval(iv);
+  },[activeDay?.active,activeDay?.startTime]);
+
+  // Set viewport meta for iPhone safe areas
+  useEffect(()=>{
+    let meta=document.querySelector('meta[name="viewport"]');
+    if(meta){meta.setAttribute('content','width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover');}
+    else{meta=document.createElement('meta');meta.name='viewport';meta.content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover';document.head.appendChild(meta);}
+  },[]);
+
   const data={expenses,shifts,dailyEarnings,personalTrips};
-  const hasLive=expenses.length||shifts.length||dailyEarnings.length||personalTrips.length;
   const isActive=activeDay?.active;
 
-  const handleNewDay=async()=>{
-    if(isActive&&hasLive){setArch(true);await archiveDay(activeDay.date,{expenses,shifts,earnings:dailyEarnings,trips:personalTrips});setArch(false);}
-    await setActiveDay(gT());
+  // Start a new shift (jornada) — always uses today's date and current time
+  const handleStartDay=async()=>{
+    const now=gTime();
+    await setActiveDay(gT(),now);
+  };
+
+  // End current shift: save shift record automatically, then deactivate
+  const handleEndDay=async()=>{
+    if(!isActive)return;
+    setClosing(true);
+    const endTime=gTime();
+    const startTime=activeDay.startTime||"00:00";
+    const date=activeDay.date||gT();
+    const shiftId=gId();
+    // Auto-save shift to shifts collection
+    await addDocument(shiftsRef(),shiftId,{id:shiftId,date:date,start:startTime,end:endTime,auto:true,createdAt:new Date().toISOString()});
+    // Deactivate the day (set active=false)
+    await setActiveDay(null);
+    setClosing(false);
   };
 
   const addDoc=async(ref,item)=>{setSaving(true);await addDocument(ref,item.id,item);setSaving(false);setModal(null);};
@@ -187,11 +230,11 @@ export default function App(){
 
   // HOME
   const Home=()=>(<div className="fade">
-    {!isActive?<button className="btn bnd" style={{marginBottom:12}} onClick={handleNewDay}>{archiving?'⏳ Archivando...':<>{I.play} Iniciar jornada de hoy</>}</button>
-    :activeDay.date!==todayStr&&hasLive?<button className="btn bnd" style={{marginBottom:12}} onClick={handleNewDay}>{archiving?'⏳ Archivando...':<>{I.sun} Cerrar {fD(activeDay.date)} e iniciar hoy</>}</button>:null}
+    {!isActive&&<button className="btn bnd" style={{marginBottom:12}} onClick={handleStartDay}>{I.play} Iniciar jornada</button>}
+    {isActive&&<button className="btn bstop" style={{marginBottom:12}} onClick={handleEndDay} disabled={closing}>{closing?'⏳ Cerrando jornada...':<>{I.stop} Terminar jornada</>}</button>}
 
     <div className="sc" style={{borderColor:'rgba(255,209,102,.2)'}}>
-      <div style={{fontSize:13,fontWeight:700,color:'var(--yl)',display:'flex',alignItems:'center',gap:6,marginBottom:10}}>{I.sun} Hoy{isActive?' — '+fD(activeDay.date):''}</div>
+      <div style={{fontSize:13,fontWeight:700,color:'var(--yl)',display:'flex',alignItems:'center',gap:6,marginBottom:10}}>{I.sun} Hoy — {fD(todayStr)}</div>
       <div className="sg" style={{marginBottom:0}}>
         <div className="sbx"><div className="sbl">Ingresos</div><div className="sbv g">{fCOP(dI)}</div></div>
         <div className="sbx"><div className="sbl">Gastos</div><div className="sbv r">{fCOP(dO)}</div></div>
@@ -245,7 +288,7 @@ export default function App(){
   // OTHER TABS
   const Exp=()=>(<div className="fade"><div className="sh"><span className="st">Gastos</span>{isActive&&<button className="btn bp bs" onClick={()=>setModal("expense")}>{I.plus} Nuevo</button>}</div>{!expenses.length?<div className="empty"><div className="ee">⛽</div><div className="et">Sin gastos hoy.</div></div>:<div className="card">{expenses.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map(e=><div key={e.id} className="li"><div className={`lic ${e.type==='Gas natural'?'gas':e.type==='Gasolina'?'fuel':'misc'}`}>{I.gas}</div><div className="lib"><div className="lim">{e.type}</div><div className="lis">{e.note||''}</div></div><div style={{display:'flex',alignItems:'center',gap:6}}>{e.receipt&&<img src={e.receipt} className="rt" onClick={()=>setVI(e.receipt)}/>}<div className="la r">-{fCOP(e.amount||0)}</div><button className="db" onClick={()=>delDoc(expensesRef(),e.id)}>{I.trash}</button></div></div>)}</div>}</div>);
 
-  const Shf=()=>(<div className="fade"><div className="sh"><span className="st">Turnos</span>{isActive&&<button className="btn bp bs" onClick={()=>setModal("shift")}>{I.plus} Nuevo</button>}</div>{!shifts.length?<div className="empty"><div className="ee">🕐</div><div className="et">Sin turnos hoy.</div></div>:<div className="card">{shifts.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map(s=>{const[sh,sm]=(s.start||'0:0').split(':').map(Number),[eh,em]=(s.end||'0:0').split(':').map(Number);let d=(eh*60+em)-(sh*60+sm);if(d<0)d+=1440;return<div key={s.id} className="li"><div className="lic" style={{background:'rgba(17,138,178,.12)',color:'var(--a2)'}}>{I.clock}</div><div className="lib"><div className="lim">{s.start} — {s.end}</div></div><div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:13,color:'var(--a2)'}}>{Math.floor(d/60)}h {d%60}m</span><button className="db" onClick={()=>delDoc(shiftsRef(),s.id)}>{I.trash}</button></div></div>;})}</div>}</div>);
+  const Shf=()=>(<div className="fade"><div className="sh"><span className="st">Turnos</span>{isActive&&<button className="btn bp bs" onClick={()=>setModal("shift")}>{I.plus} Nuevo</button>}</div>{!shifts.length?<div className="empty"><div className="ee">🕐</div><div className="et">Sin turnos hoy.</div></div>:<div className="card">{shifts.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map(s=>{const[sh,sm]=(s.start||'0:0').split(':').map(Number),[eh,em]=(s.end||'0:0').split(':').map(Number);let d=(eh*60+em)-(sh*60+sm);if(d<0)d+=1440;return<div key={s.id} className="li"><div className="lic" style={{background:'rgba(17,138,178,.12)',color:'var(--a2)'}}>{I.clock}</div><div className="lib"><div className="lim">{s.start} — {s.end}</div><div className="lis">{s.auto?'Auto-registrado':s.date||''}</div></div><div style={{display:'flex',alignItems:'center',gap:8}}><span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:13,color:'var(--a2)'}}>{Math.floor(d/60)}h {d%60}m</span><button className="db" onClick={()=>delDoc(shiftsRef(),s.id)}>{I.trash}</button></div></div>;})}</div>}</div>);
 
   const Ear=()=>(<div className="fade"><div className="sh"><span className="st">Ganancias</span>{isActive&&<button className="btn bp bs" onClick={()=>setModal("earning")}>{I.plus} Nuevo</button>}</div>{!dailyEarnings.length?<div className="empty"><div className="ee">💰</div><div className="et">Sin ganancias hoy.</div></div>:<div className="card">{dailyEarnings.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map(e=><div key={e.id} className="li"><div className="lic earn">{I.dollar}</div><div className="lib"><div className="lim">{e.platform}</div><div className="lis">Efvo: {fCOP(e.cashReceived||0)}</div></div><div style={{display:'flex',alignItems:'center',gap:6}}><div className="la g">+{fCOP(e.totalEarnings||0)}</div><button className="db" onClick={()=>delDoc(earningsRef(),e.id)}>{I.trash}</button></div></div>)}</div>}<div className="sh" style={{marginTop:16}}><span className="st">Viajes personales</span>{isActive&&<button className="btn bp bs" onClick={()=>setModal("trip")}>{I.plus} Nuevo</button>}</div>{!personalTrips.length?<div className="empty"><div className="ee">🚐</div><div className="et">Sin viajes hoy.</div></div>:<div className="card">{personalTrips.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map(t=><div key={t.id} className="li"><div className="lic trip">{I.route}</div><div className="lib"><div className="lim">{t.route||'Sin ruta'}</div><div className="lis">{t.time} · {t.client||''}</div></div><div style={{display:'flex',alignItems:'center',gap:6}}><div className="la g">+{fCOP(t.amount||0)}</div><button className="db" onClick={()=>delDoc(tripsRef(),t.id)}>{I.trash}</button></div></div>)}</div>}</div>);
 
@@ -272,7 +315,7 @@ export default function App(){
 
   return(<><style>{CSS}</style><div className="app">
     <div className="hdr"><div><h1>🚐 Conductor</h1><div className="hd">{tL}</div><div className={`syn ${synced?'ok':'off'}`}>{I.sync} {synced?'Sincronizado':'Conectando...'}</div></div><div className="pb">{PLATE}</div></div>
-    {isActive&&<div className="dbn"><div className="dbn-i">{I.sun}</div><div><div className="dbn-t">Jornada activa — {fD(activeDay.date)}</div><div className="dbn-s">Registrando datos del día</div></div></div>}
+    {isActive&&<div className="dbn"><div className="dbn-i"><span className="pulse">{I.sun}</span></div><div><div className="dbn-t">Jornada activa{activeDay.startTime?' desde '+activeDay.startTime:''}</div><div className="dbn-s">{elapsed?'Tiempo: '+elapsed:'Registrando datos'}</div></div></div>}
     <div className={`pyp ${restricted?'bad':'ok'}`}><div className="pyp-i">{restricted?I.alert:I.check}</div><div><div className="pyp-m">{restricted?'⚠️ Pico y placa':'✅ Puedes circular'}</div><div className="pyp-s">{rDig?`Placas ${rDig.join(' y ')} · 5:30-9:00 PM`:'Sin restricción'}</div></div></div>
     <div className="cnt">{tab==="home"&&<Home/>}{tab==="expenses"&&<Exp/>}{tab==="earnings"&&<Ear/>}{tab==="shifts"&&<Shf/>}{tab==="pyp"&&<Pyp/>}</div>
     <nav className="bnav">{navs.map(n=><button key={n.id} className={`nb ${tab===n.id?'act':''}`} onClick={()=>setTab(n.id)}>{n.icon}{n.l}</button>)}</nav>
